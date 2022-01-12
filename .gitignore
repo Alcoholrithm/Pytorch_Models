@@ -2,3 +2,8 @@ datasets
 *_logs/
 __pycache__/
 memo.md
+*.csv
+*.tsv
+*.xlsx
+*.pt
+build*
