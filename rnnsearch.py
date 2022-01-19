@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import random
+from tqdm import tqdm
 
 class Encoder(nn.Module):
     def __init__(self, n_inputs, n_embeddings, n_hiddens):
@@ -121,3 +122,27 @@ class RNNsearch(nn.Module):
             
     
         return outputs
+
+
+def inference(model, src_vocab, trg_vocab, src_tokenizer, srcs, device):
+    tokens = []
+    for src in srcs:
+        tokens.append([src_vocab[s] for s in src_tokenizer(src)])
+    
+    tokens = torch.LongTensor(tokens).cuda().transpose(0, 1)
+    v = list(trg_vocab.get_stoi().values())
+    k = list(trg_vocab.get_stoi().keys())
+    trg_dict = {}
+    for i in tqdm(range(len(trg_vocab.get_stoi()))):
+        trg_dict[v[i]] = k[i]
+    model.eval()
+
+    with torch.no_grad():
+        out = model(tokens, torch.LongTensor([[t for t in range(50)] for t in range(1)]).transpose(0, 1).cuda(), 0).detach().cpu()
+        out = out.transpose(0, 1)
+
+    res = []
+    for o in out:
+        res.append(' '.join([trg_dict[t.item()] for t in F.softmax(o, dim=1).argmax(1) if not trg_dict[t.item()] == '<eos>']))
+    
+    return res
