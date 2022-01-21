@@ -6,7 +6,26 @@ import random
 from tqdm import tqdm
 
 class Encoder(nn.Module):
+    """
+        A class to encode coded vector for decoder
+
+        Attributes:
+            n_hiddens : The size of hidden states
+            embedding : The embedding layer to generate coded vector from tokens
+            bidirectional_gru : The gated hidden unit to encode embedding matrix
+            fc : The fully connected layer to postprocess for decoder
+    """
     def __init__(self, n_inputs, n_embeddings, n_hiddens):
+        """
+            Initialize the encoder class
+
+            Args:
+                n_inputs : the size of the input language's vocab
+                n_embeddings : the dimension of embedding matrix
+                n_hiddens : the size of hidden states
+            Returns:
+                None
+        """
         super().__init__()
         self.n_hiddens = n_hiddens
         self.embedding = nn.Embedding(n_inputs, n_embeddings)
@@ -22,11 +41,27 @@ class Encoder(nn.Module):
 
 
 class Alignment(nn.Module):
+    """
+        A class to make attention
+
+        Attributes:
+            n_hiddens : the size of hidden states
+            v : The weighted vector to generate energy for context vector
+            align : The fully connected layer for input of decoder
+    """
     def __init__(self, n_hiddens):
+        """
+            Initialize the alignment model
+
+            Args:
+                n_hiddens : The size of hidden states
+            Returns:
+                None
+        """
         super().__init__()
         self.n_hiddens = n_hiddens
-        self.v = nn.Parameter(nn.init.uniform_(torch.empty(n_hiddens)))
         self.align = nn.Linear(self.n_hiddens * 3, self.n_hiddens)
+        self.v = nn.Parameter(nn.init.uniform_(torch.empty(n_hiddens)))
         
     def forward(self, h , s):
         e = torch.cat([h, s], dim = 2)
@@ -37,7 +72,22 @@ class Alignment(nn.Module):
         return e.squeeze(1)
 
 class Attention(nn.Module):
+    """
+        A class to generate context vectors which mean attention
+
+        Attributes:
+            n_hiddens : The size of hidden states
+            align : The alignment model which generate energy
+    """
     def __init__(self, n_hiddens):
+        """
+            Initialize the Attention Layer
+
+            Args:
+                n_hiddens : The size of hidden states
+            Returns:
+                None
+        """
         super().__init__()
         self.n_hiddens = n_hiddens
         self.align = Alignment(self.n_hiddens)
