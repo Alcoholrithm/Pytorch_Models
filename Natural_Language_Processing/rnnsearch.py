@@ -20,9 +20,9 @@ class Encoder(nn.Module):
             Initialize the encoder class
 
             Args:
-                n_inputs : the size of the input language's vocab
-                n_embeddings : the dimension of embedding matrix
-                n_hiddens : the size of hidden states
+                n_inputs : The size of the input language's vocab
+                n_embeddings : The dimension of embedding matrix
+                n_hiddens : The size of hidden states
             Returns:
                 None
         """
@@ -102,8 +102,26 @@ class Attention(nn.Module):
 
 
 class Maxout(nn.Module):
+    """
+        A class to postprocess the output of decoder
 
+        Attributes:
+            d_in : The dimension of input
+            d_out : The dimension of output
+            pool_size : The size of pooling operation
+            lin : The fully connected layer to construct maxout feature map
+    """
     def __init__(self, d_in, d_out, pool_size):
+        """
+            Initialize the maxout layer
+
+            Args:
+                d_in : The dimension of input
+                d_out : The dimension of output
+                pool_size : The size of pooling operation
+            Returns:
+                None
+        """
         super().__init__()
         self.d_in, self.d_out, self.pool_size = d_in, d_out, pool_size
         self.lin = nn.Linear(d_in, d_out * pool_size)
@@ -121,12 +139,34 @@ class Maxout(nn.Module):
 
 
 class Decoder(nn.Module):
+    """
+        A class to generate output tokens
+
+        Attributes:
+            n_hiddens : The size of hidden states
+            embedding : The embedding layer to generate coded vector from output of encoder
+            atention_layer : The attention layer to generate attention
+            bidirectional_gru : The gated hidden unit to decode input and hidden states
+            maxout : The maxout layer to postprocess of output of bidirectional gru
+            out : The fully connected layer to generate the probability of each output words
+    """
     def __init__(self, n_outputs, n_embeddings, n_hiddens, n_maxout):
+        """
+            Initialize the decoder
+
+            Args:
+                n_outputs : The size of the output language's vocab
+                n_embeddings : The dimensions of embedding matrix
+                n_hiddens : The size of hidden states
+                n_maxout : The output size of maxout layer
+            Returns:
+                None
+        """
         super().__init__()
         self.n_hiddens = n_hiddens
         self.embedding = nn.Embedding(n_outputs, n_embeddings)
         self.attention_layer = Attention(self.n_hiddens)
-        self.gru = nn.GRU(n_embeddings + n_hiddens * 2, n_hiddens)
+        self.bidirectional_gru = nn.GRU(n_embeddings + n_hiddens * 2, n_hiddens)
 
         self.maxout = Maxout(n_hiddens * 3 + n_embeddings, n_maxout, 2)
         self.out = nn.Linear(n_maxout, n_outputs)
@@ -138,7 +178,7 @@ class Decoder(nn.Module):
         embedded = embedded.unsqueeze(0)
         input = torch.cat([embedded, context], 2)
         h = h.unsqueeze(0)
-        out, hidden = self.gru(input, h)
+        out, hidden = self.bidirectional_gru(input, h)
         maxout_input = torch.cat([h, embedded, context], dim=2)
         out = self.maxout(maxout_input).squeeze(0)
         out = self.out(out)
@@ -147,7 +187,31 @@ class Decoder(nn.Module):
 
 
 class RNNsearch(nn.Module):
+    """
+        A class to translate source language tokens to target language tokens using RNNsearch model
+
+        The RNNsearch model is based on the paper 'Neural Machine Translation by Jointly Learning to Align and Translate'
+
+        Attributes:
+            n_outputs : The size of the output language's vocab
+            device : The running device of model
+            encoder : The encoder of rnnsearch
+            decoder : The decoder of rnnsearch
+    """
     def __init__(self, n_inputs, n_outputs, n_embeddings, n_hiddens, n_maxout, device):
+        """
+            Initialize the rnnsearch
+
+            Args:
+                n_inputs : The size of the input language's vocab
+                n_outputs : The size of the output language's vocab
+                n_embeddings : The dimensions of embedding matrix
+                n_hiddens : The size of hidden states
+                n_maxout : The output size of maxout layer
+                device : The running device of model
+            Returns:
+                None
+        """
         super().__init__()
         self.n_outputs = n_outputs
         self.device = device
@@ -175,11 +239,26 @@ class RNNsearch(nn.Module):
 
 
 def inference(model, src_vocab, trg_vocab, src_tokenizer, srcs, device):
+    """
+        Translate input strings to strings of output language
+        
+        Args:
+            model : The translation model
+            src_vocab : The vocab of input strings' language
+            trg_vocab : The vocab of output strings' language
+            src_tokenizer : The tokenizer to restore output tokens to words
+            srcs : The input strings to translate
+            device : The running device of model
+        Return:
+            A list of translated string [string, string, ...]
+            Each string is correspond to input strings of same location
+
+    """
     tokens = []
     for src in srcs:
         tokens.append([src_vocab[s] for s in src_tokenizer(src)])
     
-    tokens = torch.LongTensor(tokens).cuda().transpose(0, 1)
+    tokens = torch.LongTensor(tokens).to(device).transpose(0, 1)
     v = list(trg_vocab.get_stoi().values())
     k = list(trg_vocab.get_stoi().keys())
     trg_dict = {}
